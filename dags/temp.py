@@ -8,6 +8,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 import pickle
+import pytz
 
 # Ensure models directory exists
 MODELS_DIR = '/opt/airflow/models'
@@ -60,11 +61,11 @@ def train_arima_model():
     print(f"ARIMA model trained successfully with differencing order {d}")
 
 def save_model():
-    """Load the trained ARIMA model and save relevant details."""
+    """Load the trained ARIMA model and save relevant details with a timestamped filename."""
     stock_data = pd.read_csv(DATA_FILE_PATH, index_col=0, parse_dates=True)
 
     # Load the model from file
-    with open(MODEL_FILE_PATH, 'rb') as f:
+    with open(MODELS_DIR + '/arima_model.pkl', 'rb') as f:
         model_fit = pickle.load(f)
 
     # Save the model with metadata
@@ -74,11 +75,21 @@ def save_model():
         'last_date': stock_data.index[-1],
         'last_price': stock_data['Close'].iloc[-1]
     }
-    
-    with open(MODEL_FILE_PATH, 'wb') as f:
+
+    # Get current time in Colombo
+    colombo_tz = pytz.timezone('Asia/Colombo')
+    current_time_colombo = datetime.now(colombo_tz)
+    timestamp = current_time_colombo.strftime("%Y%m%d_%H%M%S")
+
+    # Define the new filename with the timestamp
+    model_filename = f'arima_model_{timestamp}.pkl'
+    model_file_path = os.path.join(MODELS_DIR, model_filename)
+
+    # Save the model metadata to the new file
+    with open(model_file_path, 'wb') as f:
         pickle.dump(model_metadata, f)
 
-    print(f"Model saved successfully to {MODEL_FILE_PATH}")
+    print(f"Model saved successfully to {model_file_path}")
 
 # Define default arguments
 default_args = {
